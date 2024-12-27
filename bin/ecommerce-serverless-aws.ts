@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { EcommerceApiStack, ProductsAppStack } from "../lib/index";
+import {
+  EcommerceApiStack,
+  ProductsAppStack,
+  ProductsAppLayersStack,
+} from "../lib/index";
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -16,13 +20,24 @@ const tags = {
   team: "mathTeam",
 };
 
+const productsAppLayersStack = new ProductsAppLayersStack(
+  app,
+  "ProductsAppLayers",
+  {
+    tags,
+    env,
+  }
+);
+
 const productsAppStack = new ProductsAppStack(app, "ProductsApp", {
   tags,
   env,
 });
+productsAppStack.addDependency(productsAppLayersStack);
 
 const ecommerceApiStack = new EcommerceApiStack(app, "EcommerceApi", {
   productsFetchHandler: productsAppStack.productsFetchHandler,
+  productsAdminHandler: productsAppStack.productsAdminHandler,
   tags,
   env,
 });
