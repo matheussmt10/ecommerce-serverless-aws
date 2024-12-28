@@ -58,10 +58,11 @@ export class ProductsAppStack extends cdk.Stack {
         entry: "lambda/products/productEventsFunction.ts",
         handler: "handler",
         memorySize: 512,
-        timeout: cdk.Duration.seconds(2),
+        timeout: cdk.Duration.seconds(10),
         bundling: {
           minify: true,
           sourceMap: true,
+          nodeModules: ["aws-xray-sdk-core"],
         },
         environment: {
           EVENTS_TABLE_NAME: props.eventsDbd.tableName,
@@ -86,6 +87,7 @@ export class ProductsAppStack extends cdk.Stack {
         bundling: {
           minify: true,
           sourceMap: true,
+          nodeModules: ["aws-xray-sdk-core"],
         },
         environment: {
           PRODUCTS_TABLE_NAME: this.productsDbd.tableName,
