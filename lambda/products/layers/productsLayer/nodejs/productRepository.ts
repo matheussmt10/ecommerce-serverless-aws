@@ -45,6 +45,27 @@ export class ProductRepository {
     return data.Item as Product;
   }
 
+  async getProductsByIds(productIds: string[]): Promise<Array<Product>> {
+    const keys: { id: string }[] = [];
+
+    productIds.forEach((productId) => {
+      keys.push({
+        id: productId,
+      });
+    });
+
+    const data = await this.client
+      .batchGet({
+        RequestItems: {
+          [this.tableName]: {
+            Keys: keys,
+          },
+        },
+      })
+      .promise();
+    return data.Responses![this.tableName] as Product[];
+  }
+
   async create(product: Product): Promise<Product> {
     product.id = randomUUID();
     const params = {

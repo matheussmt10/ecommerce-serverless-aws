@@ -25,6 +25,12 @@
       ],
       "/opt/nodejs/productEventsLayer": [
         "lambda/products/layers/productEventsLayer/nodejs/index"
+      ],
+      "/opt/nodejs/ordersLayer": [
+        "lambda/orders/layers/ordersLayer/nodejs/index"
+      ],
+      "/opt/nodejs/ordersApiLayer": [
+        "lambda/orders/layers/ordersApiLayer/nodejs/ordersApiLayer"
       ]
     }
   },
