@@ -4,10 +4,22 @@ import {
   Context,
 } from "aws-lambda";
 import { ProductRepository } from "./layers/productsLayer/nodejs";
-import { DynamoDB } from "aws-sdk";
+import { DynamoDB, Lambda } from "aws-sdk";
+import {
+  ProductEvent,
+  ProductEventType,
+} from "./layers/productEventsLayer/nodejs/productEvents";
+import * as AWSXRay from "aws-xray-sdk-core";
+import { Product } from "./layers/productsLayer/nodejs/productRepository";
+
+AWSXRay.captureAWS(require("aws-sdk"));
 
 const productDbd = process.env.PRODUCTS_TABLE_NAME ?? "";
+const productEventsFunctionName =
+  process.env.PRODUCT_EVENTS_FUNCTION_NAME ?? "";
+
 const dynamoDb = new DynamoDB.DocumentClient();
+const lambdaClient = new Lambda();
 
 const productRepository = new ProductRepository(dynamoDb, productDbd);
 
@@ -29,6 +41,13 @@ export async function handler(
         };
       }
       const productCreated = await productRepository.create(body);
+      const response = await sendProductEvents(
+        productCreated,
+        ProductEventType.CREATED,
+        "ma@ma.com.br",
+        context.awsRequestId
+      );
+      console.log(response);
       return {
         statusCode: 201,
         body: JSON.stringify(productCreated),
@@ -48,6 +67,13 @@ export async function handler(
       }
       try {
         const productUpdated = await productRepository.update(productId, body);
+        const response = await sendProductEvents(
+          productUpdated,
+          ProductEventType.UPDATED,
+          "ma@ma.com.br",
+          context.awsRequestId
+        );
+        console.log(response);
         return {
           statusCode: 201,
           body: JSON.stringify(productUpdated),
@@ -73,7 +99,14 @@ export async function handler(
         };
       }
       try {
-        await productRepository.delete(productId);
+        const productDeleted = await productRepository.delete(productId);
+        const response = await sendProductEvents(
+          productDeleted,
+          ProductEventType.DELETED,
+          "ma@ma.com.br",
+          context.awsRequestId
+        );
+        console.log(response);
         return {
           statusCode: 201,
           body: JSON.stringify({
@@ -98,4 +131,29 @@ export async function handler(
       input: event,
     }),
   };
+}
+
+async function sendProductEvents(
+  product: Product,
+  eventType: ProductEventType,
+  email: string,
+  lambdaRequestId: string
+) {
+  const event: ProductEvent = {
+    requestId: lambdaRequestId,
+    eventType: eventType,
+    productId: product.id,
+    productCode: product.code,
+    productPrice: product.price,
+    userEmail: email,
+    type: eventType,
+  };
+
+  return lambdaClient
+    .invoke({
+      FunctionName: productEventsFunctionName,
+      InvocationType: "RequestResponse",
+      Payload: JSON.stringify(event),
+    })
+    .promise();
 }

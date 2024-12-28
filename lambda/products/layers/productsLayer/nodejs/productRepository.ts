@@ -80,7 +80,7 @@ export class ProductRepository {
     return data.Attributes as Product;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string): Promise<Product> {
     const params = {
       TableName: this.tableName,
       Key: {
@@ -96,5 +96,7 @@ export class ProductRepository {
         "Cannot delete product because it does not exist in the database"
       );
     }
+
+    return data.Attributes as Product;
   }
 }

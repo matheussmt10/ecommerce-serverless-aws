@@ -4,6 +4,7 @@ import {
   EcommerceApiStack,
   ProductsAppStack,
   ProductsAppLayersStack,
+  EventsDbdStack,
 } from "../lib/index";
 import * as dotenv from "dotenv";
 dotenv.config();
@@ -29,11 +30,18 @@ const productsAppLayersStack = new ProductsAppLayersStack(
   }
 );
 
+const eventsDbdStack = new EventsDbdStack(app, "EventsDbd", {
+  tags,
+  env,
+});
+
 const productsAppStack = new ProductsAppStack(app, "ProductsApp", {
+  eventsDbd: eventsDbdStack.eventsDbd,
   tags,
   env,
 });
 productsAppStack.addDependency(productsAppLayersStack);
+productsAppStack.addDependency(eventsDbdStack);
 
 const ecommerceApiStack = new EcommerceApiStack(app, "EcommerceApi", {
   productsFetchHandler: productsAppStack.productsFetchHandler,

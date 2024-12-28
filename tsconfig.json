@@ -20,8 +20,11 @@
     "typeRoots": ["./node_modules/@types"],
     "baseUrl": "./",
     "paths": {
-      "/opt/nodejs/productsLayers": [
-        "lambda/products/layers/productsLayer/nodejs/index.ts"
+      "/opt/nodejs/productsLayer": [
+        "lambda/products/layers/productsLayer/nodejs/index"
+      ],
+      "/opt/nodejs/productEventsLayer": [
+        "lambda/products/layers/productEventsLayer/nodejs/index"
       ]
     }
   },
