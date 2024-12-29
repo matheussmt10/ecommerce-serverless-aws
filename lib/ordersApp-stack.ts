@@ -3,10 +3,13 @@ import * as lambdaNodeJs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
 interface OrdersAppStackProps extends cdk.StackProps {
   productDbd: dynamodb.Table;
+  eventsDbd: dynamodb.Table;
 }
 
 export class OrdersAppStack extends cdk.Stack {
@@ -54,6 +57,17 @@ export class OrdersAppStack extends cdk.Stack {
       ordersApiLayerArn
     );
 
+    const orderEventsLayerArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      "OrderEventsLayerArn"
+    );
+
+    const orderEventsLayer = lambda.LayerVersion.fromLayerVersionArn(
+      this,
+      "OrderEventsLayer",
+      orderEventsLayerArn
+    );
+
     const productsLayerArn = ssm.StringParameter.valueForStringParameter(
       this,
       "ProductsLayerArn"
@@ -64,6 +78,11 @@ export class OrdersAppStack extends cdk.Stack {
       "ProductsLayer",
       productsLayerArn
     );
+
+    const ordersTopic = new sns.Topic(this, "OrderEventsTopic", {
+      displayName: "OrderEventsTopic",
+      topicName: "order-events",
+    });
 
     this.ordersHandler = new lambdaNodeJs.NodejsFunction(
       this,
@@ -83,8 +102,9 @@ export class OrdersAppStack extends cdk.Stack {
         environment: {
           PRODUCTS_TABLE: props.productDbd.tableName,
           ORDERS_TABLE: this.ordersDbd.tableName,
+          ORDER_EVENTS_TOPIC_ARN: ordersTopic.topicArn,
         },
-        layers: [ordersLayer, productsLayer, ordersApiLayer],
+        layers: [ordersLayer, productsLayer, ordersApiLayer, orderEventsLayer],
         tracing: lambda.Tracing.ACTIVE,
         insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0,
       }
@@ -92,5 +112,33 @@ export class OrdersAppStack extends cdk.Stack {
 
     this.ordersDbd.grantReadWriteData(this.ordersHandler);
     props.productDbd.grantReadData(this.ordersHandler);
+    ordersTopic.grantPublish(this.ordersHandler);
+
+    const orderEventsHandler = new lambdaNodeJs.NodejsFunction(
+      this,
+      "OrderEventsFunction",
+      {
+        functionName: "OrderEventsFunction",
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: "lambda/orders/orderEventsFunction.ts",
+        handler: "handler",
+        memorySize: 512,
+        timeout: cdk.Duration.seconds(10),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          nodeModules: ["aws-xray-sdk-core"],
+        },
+        environment: {
+          EVENTS_DDB: props.eventsDbd.tableName,
+        },
+        layers: [ordersLayer, productsLayer, ordersApiLayer, orderEventsLayer],
+        tracing: lambda.Tracing.ACTIVE,
+        insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0,
+      }
+    );
+    ordersTopic.addSubscription(
+      new snsSubscriptions.LambdaSubscription(orderEventsHandler)
+    );
   }
 }

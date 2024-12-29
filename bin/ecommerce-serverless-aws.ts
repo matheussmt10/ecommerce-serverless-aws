@@ -52,6 +52,7 @@ const ordersAppLayersStack = new OrdersAppLayersStack(app, "OrdersAppLayers", {
 
 const ordersAppStack = new OrdersAppStack(app, "OrdersApp", {
   productDbd: productsAppStack.productsDbd,
+  eventsDbd: eventsDbdStack.eventsDbd,
   tags,
   env,
 });
