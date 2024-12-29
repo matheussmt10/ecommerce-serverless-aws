@@ -5,6 +5,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
 interface OrdersAppStackProps extends cdk.StackProps {
@@ -66,6 +67,18 @@ export class OrdersAppStack extends cdk.Stack {
       this,
       "OrderEventsLayer",
       orderEventsLayerArn
+    );
+
+    const orderEventsRepositoryLayerArn =
+      ssm.StringParameter.valueForStringParameter(
+        this,
+        "OrderEventsRepositoryLayerArn"
+      );
+
+    const orderEventsRepositoryLayer = lambda.LayerVersion.fromLayerVersionArn(
+      this,
+      "OrderEventsRepositoryLayer",
+      orderEventsRepositoryLayerArn
     );
 
     const productsLayerArn = ssm.StringParameter.valueForStringParameter(
@@ -130,9 +143,9 @@ export class OrdersAppStack extends cdk.Stack {
           nodeModules: ["aws-xray-sdk-core"],
         },
         environment: {
-          EVENTS_DDB: props.eventsDbd.tableName,
+          EVENTS_TABLE_NAME: props.eventsDbd.tableName,
         },
-        layers: [ordersLayer, productsLayer, ordersApiLayer, orderEventsLayer],
+        layers: [orderEventsLayer, orderEventsRepositoryLayer],
         tracing: lambda.Tracing.ACTIVE,
         insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0,
       }
@@ -140,5 +153,12 @@ export class OrdersAppStack extends cdk.Stack {
     ordersTopic.addSubscription(
       new snsSubscriptions.LambdaSubscription(orderEventsHandler)
     );
+
+    const eventsDbdPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ["dynamodb:PutItem"],
+      resources: [props.eventsDbd.tableArn],
+    });
+    orderEventsHandler.addToRolePolicy(eventsDbdPolicy);
   }
 }
