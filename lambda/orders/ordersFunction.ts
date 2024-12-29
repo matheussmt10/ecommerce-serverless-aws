@@ -1,4 +1,4 @@
-import { DynamoDB } from "aws-sdk";
+import { DynamoDB, SNS } from "aws-sdk";
 import { OrderRepository } from "./layers/ordersLayer/nodejs";
 import { ProductRepository } from "/opt/nodejs/productsLayer";
 import * as AWSXRay from "aws-xray-sdk-core";
@@ -17,6 +17,7 @@ import {
 } from "/opt/nodejs/ordersApiLayer";
 import { Product } from "lambda/products/layers/productsLayer/nodejs/productRepository";
 import { Order } from "./layers/ordersLayer/nodejs/orderRepository";
+import { OrderEventType } from "/opt/nodejs/orderEventsLayer";
 
 AWSXRay.captureAWS(require("aws-sdk"));
 
@@ -24,6 +25,9 @@ const ordersDdb = process.env.ORDERS_TABLE_NAME ?? "orders";
 const productDdb = process.env.PRODUCTS_TABLE_NAME ?? "products";
 
 const ddbClient = new DynamoDB.DocumentClient();
+
+const orderEventsTopicArn = process.env.ORDER_EVENTS_TOPIC_ARN ?? "";
+const snsClient = new SNS();
 
 const orderRepository = new OrderRepository(ddbClient, ordersDdb);
 
@@ -61,6 +65,8 @@ export async function handler(
 
     const orderMapped = mapOrder(body, products);
     const orderCreated = await orderRepository.create(orderMapped);
+
+    await sendOrderEvent(orderCreated, OrderEventType.CREATED, lambdaRequestId);
     return {
       statusCode: 201,
       body: JSON.stringify(convertToOrderResponse(orderCreated)),
@@ -70,6 +76,11 @@ export async function handler(
     const email = event.queryStringParameters!.email as string;
     try {
       const orderDeleted = await orderRepository.delete(email, orderId);
+      await sendOrderEvent(
+        orderDeleted,
+        OrderEventType.DELETED,
+        lambdaRequestId
+      );
 
       return {
         statusCode: 200,
@@ -136,6 +147,32 @@ export async function handler(
       message: "Invalid request!",
     }),
   };
+}
+
+function sendOrderEvent(
+  order: Order,
+  eventType: OrderEventType,
+  lambdaRequestId: string
+) {
+  const orderEvent = {
+    email: order.pk,
+    orderId: order.sk,
+    shipping: order.shipping,
+    billing: order.billing,
+    productCodes: order.products.map((product) => product.code),
+    requestId: lambdaRequestId,
+  };
+  const envelope = {
+    eventType: eventType,
+    data: JSON.stringify(orderEvent),
+  };
+
+  return snsClient
+    .publish({
+      TopicArn: orderEventsTopicArn,
+      Message: JSON.stringify(envelope),
+    })
+    .promise();
 }
 
 function convertToOrderResponse(order: Order): OrderResponse {
