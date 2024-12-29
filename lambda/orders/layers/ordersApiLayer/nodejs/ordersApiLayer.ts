@@ -17,7 +17,7 @@ export enum CarrierType {
 
 export interface OrderRequest {
   email: string;
-  productsId: Array<string>;
+  productIds: Array<string>;
   payment: PaymentType;
   shipping: {
     type: ShippingType;

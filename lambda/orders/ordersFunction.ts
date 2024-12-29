@@ -52,9 +52,9 @@ export async function handler(
       };
     }
 
-    const products = await productRepository.getProductsByIds(body.productsId);
+    const products = await productRepository.getProductsByIds(body.productIds);
 
-    if (products.length !== body.productsId.length) {
+    if (products.length !== body.productIds.length) {
       return {
         statusCode: 404,
         body: JSON.stringify({
@@ -166,6 +166,8 @@ function sendOrderEvent(
     eventType: eventType,
     data: JSON.stringify(orderEvent),
   };
+
+  console.log("Sending Order Event", orderEvent);
 
   return snsClient
     .publish({
