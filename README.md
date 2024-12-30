@@ -73,4 +73,4 @@ Para aprofundar seu conhecimento sobre arquiteturas serverless para e-commerce n
 
 ## Licença
 
-Este projeto está licenciado sob a Licença MIT.
+Este projeto está licenciado sob a licença MIT.
